@@ -22,6 +22,8 @@ telnet localhost 4444
 ```bash
 # 1. 配置编译环境
 ./waf configure --board PRSLab_FC
+# 软件匹配双进度（默认不用）
+./waf configure --board PRSLab_FC --ekf-double
 
 # 2. 编译并使用 daplink+openocd 刷入
 ./waf copter
@@ -108,3 +110,8 @@ git commit -m "update DEV_Note.md"
 git commit --amend --no-edit
 git rebase upstream/master
 ```
+
+# 安全芯片的使用
+I2C4 地址 0x60
+编译开启功能：在未来编译时，可能需要通过类似 ./waf configure --board PRSLab_FC --enable-opendroneid 的标志来把安全加密库（CryptoAuthLib）编译进你的固件。
+地面站参数激活：在 QGC 里配置与 DID_ (Drone ID) 相关的参数，告诉飞控“去 I2C4 总线上用加密芯片进行签名”。
