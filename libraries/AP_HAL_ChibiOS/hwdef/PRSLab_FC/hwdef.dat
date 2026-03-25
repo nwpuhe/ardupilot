@@ -1,0 +1,51 @@
+# ==========================================
+# PRSLab_FC 主程序配置 (Rover)
+# ==========================================
+# 1. 继承基础配置
+include hwdef-bl.dat
+
+# 2. 抢回主程序起始地址 (覆盖 bl.dat 里的 0)
+FLASH_RESERVE_START_KB 128
+
+# 3. 基础通信与 DMA (防编译报错)
+DMA_PRIORITY SDMMC* USART* UART* ADC* SPI* TIM* I2C*
+
+# ==========================================
+# RGB 状态灯 (由主程序 AP_Notify 库全面接管)
+# ==========================================
+PE3 LED_RED OUTPUT OPENDRAIN GPIO(90) HIGH
+PE4 LED_GREEN OUTPUT OPENDRAIN GPIO(91) HIGH
+PE5 LED_BLUE OUTPUT OPENDRAIN GPIO(92) HIGH
+
+define AP_NOTIFY_GPIO_LED_RGB_RED_PIN 90
+define AP_NOTIFY_GPIO_LED_RGB_GREEN_PIN 91
+define AP_NOTIFY_GPIO_LED_RGB_BLUE_PIN 92
+define AP_NOTIFY_GPIO_LED_RGB_ENABLED 1
+
+# ==========================================
+# 真实物理外设 (预留)
+# ==========================================
+PB6 USART1_TX USART1
+PB7 USART1_RX USART1
+# PC6 USART6_TX USART6
+# PC7 USART6_RX USART6
+
+# ==========================================
+# 骗过编译器的 ADC 诱饵 (必须有至少一个ADC才能生成DMA)
+# ==========================================
+PA0 BATTERY_VOLTAGE_SENS ADC1 SCALE(1)
+
+
+
+# ==========================================
+# 硬件参数存储 (FM25V02A-GTR FRAM)
+# ==========================================
+PF7 SPI5_SCK SPI5
+PH7 SPI5_MISO SPI5
+PF11 SPI5_MOSI SPI5
+PG7 FRAM_CS CS
+
+# 注册 SPI 设备 (严格参考 HolybroV6X 的 DEVID 格式)
+SPIDEV ramtron SPI5 DEVID1 FRAM_CS MODE3 8*MHZ 8*MHZ
+define HAL_WITH_RAMTRON 1
+define HAL_STORAGE_SIZE 32768
