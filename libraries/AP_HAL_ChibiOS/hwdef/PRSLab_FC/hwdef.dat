@@ -78,3 +78,59 @@ BARO BMP388 I2C:0:0x76
 
 # SPL06 挂在 I2C4 (即上方的 bus 1)，假设其地址也为 0x76
 BARO SPL06 I2C:1:0x76
+
+# ==========================================
+# 1. SPI 物理引脚映射
+# ==========================================
+PG9 SPI1_MISO SPI1
+PB5 SPI1_MOSI SPI1
+PA5 SPI1_SCK SPI1
+
+PI2 SPI2_MISO SPI2
+PI3 SPI2_MOSI SPI2
+PI1 SPI2_SCK SPI2
+
+PC11 SPI3_MISO SPI3
+PB2 SPI3_MOSI SPI3
+PC10 SPI3_SCK SPI3
+
+# ==========================================
+# 2. 片选 (CS) 映射
+# ==========================================
+PI9 SP1_CS1 CS
+PH5 SP2_CS1 CS
+PI4 SP3_CS1 CS
+PI8 SP3_CS2 CS
+
+# ==========================================
+# 3. 中断 (DRDY) 映射
+# ==========================================
+PG8 SP1_DRDY1 INPUT
+PA10 SP2_DRDY2 INPUT
+PI6 SP3_DRDY1 INPUT
+PI7 SP3_DRDY2 INPUT
+
+# ==========================================
+# 4. 注册虚拟 SPI 设备
+# ==========================================
+SPIDEV dev_spi1_1 SPI1 DEVID1 SP1_CS1 MODE3 10*MHZ 10*MHZ
+SPIDEV dev_spi2_1 SPI2 DEVID1 SP2_CS1 MODE3 2*MHZ 8*MHZ
+SPIDEV dev_spi3_1 SPI3 DEVID1 SP3_CS1 MODE3 10*MHZ 10*MHZ
+SPIDEV dev_spi3_2 SPI3 DEVID2 SP3_CS2 MODE3 10*MHZ 10*MHZ
+
+# ==========================================
+# 5. 挂载 IMU 驱动
+# ROTATION_NONE (默认正向)
+# ROTATION_YAW_90 (偏航角顺时针转 90 度)
+# ROTATION_YAW_180 (偏航角转 180 度，即装反了)
+# ROTATION_YAW_270 (偏航角顺时针转 270 度)
+# ROTATION_ROLL_180 (板子正面朝上，但芯片贴在板子背面)
+# ROTATION_ROLL_180_YAW_90 (贴在背面，且转了 90 度)
+# ==========================================
+IMU BMI270       SPI:dev_spi1_1                ROTATION_ROLL_180
+IMU Invensensev3 SPI:dev_spi2_1                ROTATION_ROLL_180
+IMU BMI088       SPI:dev_spi3_1 SPI:dev_spi3_2 ROTATION_ROLL_180
+
+
+
+# 需要确认双精度FPU开启了没有
