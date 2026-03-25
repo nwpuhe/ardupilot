@@ -35,8 +35,6 @@ PB7 USART1_RX USART1
 # ==========================================
 PA0 BATTERY_VOLTAGE_SENS ADC1 SCALE(1)
 
-
-
 # ==========================================
 # 硬件参数存储 (FM25V02A-GTR FRAM)
 # ==========================================
@@ -45,7 +43,7 @@ PH7 SPI5_MISO SPI5
 PF11 SPI5_MOSI SPI5
 PG7 FRAM_CS CS
 
-# 注册 SPI 设备 (严格参考 HolybroV6X 的 DEVID 格式)
+# 注册 SPI 设备
 SPIDEV ramtron SPI5 DEVID1 FRAM_CS MODE3 8*MHZ 8*MHZ
 define HAL_WITH_RAMTRON 1
 define HAL_STORAGE_SIZE 32768
@@ -71,13 +69,16 @@ PF15 I2C4_SDA I2C4
 I2C_ORDER I2C2 I2C4
 
 # ==========================================
-# 气压计驱动配置
+# 气压计与磁力计驱动配置 (I2C)
 # ==========================================
-# BMP388 挂在 I2C2 (即上方的 bus 0)，硬件 CSB 已上拉 3.3V 且 SDO 接地，地址固定为 0x76
+# BMP388 挂在 I2C2 (bus 0)，硬件 CSB 已上拉 3.3V 且 SDO 接地，地址固定为 0x76
 BARO BMP388 I2C:0:0x76
 
-# SPL06 挂在 I2C4 (即上方的 bus 1)，假设其地址也为 0x76
+# SPL06 挂在 I2C4 (bus 1)，假设其地址也为 0x76
 BARO SPL06 I2C:1:0x76
+
+# MMC5983MA 挂在 I2C2 (bus 0)，默认地址通常为 0x30，内部罗盘(false)
+COMPASS MMC5XX3 I2C:0:0x30 false ROTATION_ROLL_180_YAW_270
 
 # ==========================================
 # 1. SPI 物理引脚映射
@@ -103,7 +104,7 @@ PI4 SP3_CS1 CS
 PI8 SP3_CS2 CS
 
 # ==========================================
-# 3. 中断 (DRDY) 映射
+# 3. 中断 (DRDY) 映射 (预留为输入)
 # ==========================================
 PG8 SP1_DRDY1 INPUT
 PA10 SP2_DRDY2 INPUT
@@ -120,17 +121,39 @@ SPIDEV dev_spi3_2 SPI3 DEVID2 SP3_CS2 MODE3 10*MHZ 10*MHZ
 
 # ==========================================
 # 5. 挂载 IMU 驱动
-# ROTATION_NONE (默认正向)
-# ROTATION_YAW_90 (偏航角顺时针转 90 度)
-# ROTATION_YAW_180 (偏航角转 180 度，即装反了)
-# ROTATION_YAW_270 (偏航角顺时针转 270 度)
-# ROTATION_ROLL_180 (板子正面朝上，但芯片贴在板子背面)
-# ROTATION_ROLL_180_YAW_90 (贴在背面，且转了 90 度)
 # ==========================================
-IMU BMI270       SPI:dev_spi1_1                ROTATION_ROLL_180
-IMU Invensensev3 SPI:dev_spi2_1                ROTATION_ROLL_180
-IMU BMI088       SPI:dev_spi3_1 SPI:dev_spi3_2 ROTATION_ROLL_180
+IMU BMI270       SPI:dev_spi1_1                ROTATION_YAW_270
+IMU Invensensev3 SPI:dev_spi2_1                ROTATION_YAW_180
+IMU BMI088       SPI:dev_spi3_1 SPI:dev_spi3_2 ROTATION_YAW_270
 
 
+# ==========================================
+# 10. TF/MicroSD 卡驱动 (SDMMC2)
+# ==========================================
+PD6  SDMMC2_CK SDMMC2
+PD7  SDMMC2_CMD SDMMC2
+PB14 SDMMC2_D0 SDMMC2
+PB15 SDMMC2_D1 SDMMC2
+PG11 SDMMC2_D2 SDMMC2
+PB4  SDMMC2_D3 SDMMC2
 
-# 需要确认双精度FPU开启了没有
+
+# 如果不接检测引脚，某些架构下需要这样强制“始终存在”
+define HAL_SDCARD_ALWAYS_PRESENT 1
+# 定义 TF 卡检测引脚 (假设你使用了 GPIO10)
+# GPIO10 SD_CD INPUT LOW
+# 告诉系统这就是 SD 卡检测信号
+# define HAL_GPIO_PIN_SD_CD 10
+
+# 告诉系统使用 FATFS 文件系统并挂载到 SDMMC2 上
+define FATFS_HAL_DEVICE SDCD2
+define HAL_OS_FATFS_IO 1
+
+
+# 1. 定义物理引脚、标签、初始状态，并分配一个 GPIO 索引号（例如 80）
+PB10 HEATER_EN OUTPUT LOW GPIO(80)
+# 2. 将该索引号绑定到 ArduPilot 的恒温器宏定义上
+define HAL_HEATER_GPIO_PIN 80
+# 3. 开启(1)/关闭(0)恒温逻辑并设置默认参数
+define HAL_HAVE_IMU_HEATER 0
+define HAL_IMU_TEMP_DEFAULT 45
