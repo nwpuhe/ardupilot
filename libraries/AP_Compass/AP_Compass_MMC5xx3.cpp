@@ -232,10 +232,10 @@ void AP_Compass_MMC5XX3::timer()
          */
         Vector3f f1 {float((data0[0] << 8) + data0[1]) - zero_offset,
                     float((data0[2] << 8) + data0[3]) - zero_offset,
-                    float((data0[4] << 8) + data0[5]) - zero_offset};
+                    -(float((data0[4] << 8) + data0[5]) - zero_offset)};
         Vector3f f2 {float((data1[0] << 8) + data1[1]) - zero_offset,
                     float((data1[2] << 8) + data1[3]) - zero_offset,
-                    float((data1[4] << 8) + data1[5]) - zero_offset};
+                    -(float((data1[4] << 8) + data1[5]) - zero_offset)};
 
         Vector3f field {(f2 - f1) * counts_to_milliGauss * 0.5f};
         Vector3f new_offset {(f1 + f2) * counts_to_milliGauss * 0.5f};
@@ -283,7 +283,7 @@ void AP_Compass_MMC5XX3::timer()
 
         Vector3f field {float((data1[0] << 8) + data1[1]) - zero_offset,
                        float((data1[2] << 8) + data1[3]) - zero_offset,
-                       float((data1[4] << 8) + data1[5]) - zero_offset};
+                       -(float((data1[4] << 8) + data1[5]) - zero_offset)};
         field *= counts_to_milliGauss;
         field -= offset;
         accumulate_sample(field);
