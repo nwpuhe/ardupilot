@@ -3,16 +3,21 @@ libraries/AP_HAL_ChibiOS/hwdef/PRSLab_FC/目录下编写 hwdef.dat 和 hwdef-bl.
 ```bash
 # 编译bootloader
 Tools/scripts/build_bootloaders.py PRSLab_FC
+
 # 或者如下方便编译拷贝
 ./waf clean
 rm -rf build/PRSLab_FC
+rm -rf Tools/bootloaders/PRSLab_FC_bl.bin
 ./waf configure --board PRSLab_FC --bootloader
 ./waf bootloader
 cp build/PRSLab_FC/bin/AP_Bootloader.bin Tools/bootloaders/PRSLab_FC_bl.bin
 
-# 擦除+烧录
+# 擦除+烧录（第一次刷bootloader需要使用daplink）
 openocd -f interface/cmsis-dap.cfg -f target/stm32h7x.cfg -c "flash bank bank1 stm32h7x 0x08100000 0 0 0 stm32h7x.cpu0" -c "init" -c "reset halt" -c "flash erase_sector 0 0 last" -c "flash erase_sector 1 0 last" -c "shutdown"
 openocd -f interface/cmsis-dap.cfg -f target/stm32h7x.cfg -c "program build/PRSLab_FC/bin/AP_Bootloader.bin verify reset exit 0x08000000"
+
+# 已经刷过bootloader，更新bootloader可以通过typec直接更新bootloader固件
+./waf bootloader --upload
 
 # 调试
 openocd -f interface/cmsis-dap.cfg -f target/stm32h7x.cfg
@@ -20,8 +25,10 @@ telnet localhost 4444
 ```
 
 ```bash
-# 1. 配置编译环境
+# 1. 配置编译环境（不允许debug）
 ./waf configure --board PRSLab_FC
+# 允许 daplink 进行 debug
+./waf configure --board PRSLab_FC --debug
 # 软件匹配双进度（默认不用）
 ./waf configure --board PRSLab_FC --ekf-double
 
@@ -115,3 +122,30 @@ git rebase upstream/master
 I2C4 地址 0x60
 编译开启功能：在未来编译时，可能需要通过类似 ./waf configure --board PRSLab_FC --enable-opendroneid 的标志来把安全加密库（CryptoAuthLib）编译进你的固件。
 地面站参数激活：在 QGC 里配置与 DID_ (Drone ID) 相关的参数，告诉飞控“去 I2C4 总线上用加密芯片进行签名”。
+
+
+# [参数配置]
+
+# 设为 7 开启 3 IMU
+EK3_IMU_MASK 7
+
+# 温度校准
+INS_TCAL_OPTIONS 1
+INS_TCAL1_ENABLE Enable
+INS_TCAL2_ENABLE Enable
+INS_TCAL3_ENABLE Enable
+
+# INS 位置
+INS_POS1_X
+INS_POS1_Y
+INS_POS1_Z
+INS_POS2_X
+INS_POS2_Y
+INS_POS2_Z
+INS_POS3_X
+INS_POS3_Y
+INS_POS3_Z
+
+# 罗盘
+COMPASS_AUTO_ROT Disable
+COMPASS_CAL_FIT Relaxed
