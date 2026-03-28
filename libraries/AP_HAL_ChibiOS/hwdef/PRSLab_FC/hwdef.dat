@@ -8,7 +8,8 @@ include hwdef-bl.dat
 FLASH_RESERVE_START_KB 128
 
 # 3. 基础通信与 DMA (防编译报错)
-DMA_PRIORITY SDMMC* USART* UART* ADC* SPI* TIM* I2C*
+# 综合优化：确保传感器 SPI 最优先，电调遥测 UART4 紧随其后
+DMA_PRIORITY SPI* UART4* SDMMC* ADC* TIM* USART* UART* I2C*
 
 # ==========================================
 # RGB 状态灯 (由主程序 AP_Notify 库全面接管)
@@ -237,12 +238,6 @@ PH6 TIM12_CH1 TIM12 PWM(7) GPIO(56) NODMA
 PH9 TIM12_CH2 TIM12 PWM(8) GPIO(57) NODMA
 
 # ==========================================
-# 遥控器输入 (RC Input)
-# ==========================================
-# PULLDOWN 确保悬空时不会触发杂波中断
-PI5 TIM8_CH1 TIM8 RCININT PULLDOWN LOW
-
-# ==========================================
 # 蜂鸣器 (Buzzer)
 # ==========================================
 PF9 TIM14_CH1 TIM14 GPIO(77) ALARM
@@ -278,5 +273,12 @@ define HAL_CAN_DEFAULT_NODE_ID 10
 
 # ==========================================
 # UM982 高精度时钟同步 (PPS 输入)
+# 复用原 RCIN 引脚作为高精度时间戳捕获
 # ==========================================
-PH13 EXT_IO INPUT PULLDOWN GPIO(81)
+PI5 PPS_IN INPUT PULLDOWN GPIO(81)
+
+# ==========================================
+# 外部扩展与触发接口 (EXT_IO)
+# 用于：相机快门触发 / 舵机抛投控制
+# ==========================================
+PH13 EXT_IO OUTPUT LOW GPIO(82)
