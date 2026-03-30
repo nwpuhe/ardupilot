@@ -1,284 +1,207 @@
-# ==========================================
-# PRSLab_FC 主程序配置 (Rover)
-# ==========================================
-# 1. 继承基础配置
+# ==============================================================================
+# PRSLab_FC (Rover) 主程序硬件定义文件 (hwdef.dat)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. 核心系统基础配置
+# ------------------------------------------------------------------------------
 include hwdef-bl.dat
 
-# 2. 抢回主程序起始地址 (覆盖 bl.dat 里的 0)
-FLASH_RESERVE_START_KB 128
+# 抢回主程序起始地址 (覆盖 bl.dat 里的 0)
+FLASH_RESERVE_START_KB  128
 
-# 3. 基础通信与 DMA (防编译报错)
-# 综合优化：确保传感器 SPI 最优先，电调遥测 UART4 紧随其后
+# 开启串口 Shell 调试支持
+define HAL_HAVE_BOARD_SHELL 1
+
+# 综合优化 DMA 优先级：确保传感器 SPI 最优先，电调遥测 UART4 紧随其后
 DMA_PRIORITY SPI* UART4* SDMMC* ADC* TIM* USART* UART* I2C*
 
-# ==========================================
-# RGB 状态灯 (由主程序 AP_Notify 库全面接管)
-# ==========================================
-PE3 LED_RED OUTPUT OPENDRAIN GPIO(90) HIGH
-PE4 LED_GREEN OUTPUT OPENDRAIN GPIO(91) HIGH
-PE5 LED_BLUE OUTPUT OPENDRAIN GPIO(92) HIGH
+# ------------------------------------------------------------------------------
+# 2. 系统电源与基础控制
+# ------------------------------------------------------------------------------
+# 传感器 LDO 供电使能
+PI11    VDD_3V3_SENSORS1_EN  OUTPUT HIGH
+PF4     VDD_3V3_SENSORS2_EN  OUTPUT HIGH
 
-define AP_NOTIFY_GPIO_LED_RGB_RED_PIN 90
-define AP_NOTIFY_GPIO_LED_RGB_GREEN_PIN 91
-define AP_NOTIFY_GPIO_LED_RGB_BLUE_PIN 92
-define AP_NOTIFY_GPIO_LED_RGB_ENABLED 1
+# IMU 恒温加热控制
+PB10    HEATER_EN            OUTPUT LOW    GPIO(80)
+define HAL_HEATER_GPIO_PIN   80
+define HAL_HAVE_IMU_HEATER   0
+define HAL_IMU_TEMP_DEFAULT  45
 
-# ==========================================
-# 真实物理外设与通信接口
-# ==========================================
+# 外部扩展与触发接口 (EXT_IO: 相机快门/舵机抛投)
+PH13    EXT_IO               OUTPUT LOW    GPIO(82)
 
-# USART6 (分配为：遥控接收机接口)
-PC6 USART6_TX USART6
-PC7 USART6_RX USART6
+# ------------------------------------------------------------------------------
+# 3. 存储与文件系统
+# ------------------------------------------------------------------------------
+# 硬件参数存储 (FM25V02A-GTR FRAM)
+PF7     SPI5_SCK             SPI5
+PH7     SPI5_MISO            SPI5
+PF11    SPI5_MOSI            SPI5
+PG7     FRAM_CS              CS
+SPIDEV  ramtron              SPI5 DEVID1 FRAM_CS MODE3 8*MHZ 8*MHZ
+define HAL_WITH_RAMTRON      1
+define HAL_STORAGE_SIZE      32768
 
-# USART1 (分配为：GPS 接口)
-PB6 USART1_TX USART1
-PB7 USART1_RX USART1
+# TF/MicroSD 卡驱动 (FATFS 挂载至 SDMMC2)
+PD6     SDMMC2_CK            SDMMC2
+PD7     SDMMC2_CMD           SDMMC2
+PB14    SDMMC2_D0            SDMMC2
+PB15    SDMMC2_D1            SDMMC2
+PG11    SDMMC2_D2            SDMMC2
+PB4     SDMMC2_D3            SDMMC2
+define HAL_SDCARD_ALWAYS_PRESENT 1
+define FATFS_HAL_DEVICE      SDCD2
+define HAL_OS_FATFS_IO       1
 
-# USART3 (分配为：数字图传数据接口)
-PD8 USART3_TX USART3
-PD9 USART3_RX USART3
+# ------------------------------------------------------------------------------
+# 4. 串口通信与逻辑映射
+# ------------------------------------------------------------------------------
+# 物理接口定义
+PC6     USART6_TX            USART6  # 遥控接收机
+PC7     USART6_RX            USART6
 
-# UART8 (分配为：数字图传 SBUS 单线接收接口)
-PE0 UART8_RX UART8
+PB6     USART1_TX            USART1  # GPS
+PB7     USART1_RX            USART1
 
-# UART4 (分配为：电调遥测 ESC Telemetry 单线接收接口)
-PH14 UART4_RX UART4
+PD8     USART3_TX            USART3  # 数字图传数据
+PD9     USART3_RX            USART3
 
-# UART5 (分配为：带硬件流控的自定义扩展接口)
-PC12 UART5_TX UART5
-PD2 UART5_RX UART5
-PC8 UART5_RTS UART5
-PC9 UART5_CTS UART5
+PE0     UART8_RX             UART8   # 数字图传 SBUS 接收
 
-# ==========================================
-# 逻辑串口映射顺序 (决定地面站里的 SERIALX 编号)
-# ==========================================
-# 映射规则：从左至右，索引从 0 开始严格递增
+PH14    UART4_RX             UART4   # 电调遥测 (ESC Telemetry)
+
+PC12    UART5_TX             UART5   # 自定义扩展接口 (带硬件流控)
+PD2     UART5_RX             UART5
+PC8     UART5_RTS            UART5
+PC9     UART5_CTS            UART5
+
+# 逻辑串口映射顺序 (SERIALX 编号对应表)
 # SERIAL0: OTG1   (USB 调试)
 # SERIAL1: USART6 (遥控接收机)
 # SERIAL2: USART1 (GPS)
 # SERIAL3: USART3 (数字图传数据)
-# SERIAL4: UART8  (数字图传接收机)
+# SERIAL4: UART8  (图传接收机)
 # SERIAL5: UART4  (电调遥测)
 # SERIAL6: UART5  (自定义扩展)
-
 SERIAL_ORDER OTG1 USART6 USART1 USART3 UART8 UART4 UART5
 
-# ==========================================
-# 骗过编译器的 ADC 诱饵 (必须有至少一个ADC才能生成DMA)
-# ==========================================
-# PA0 BATTERY_VOLTAGE_SENS ADC1 SCALE(1)
+# ------------------------------------------------------------------------------
+# 5. I2C 总线映射与传感器
+# ------------------------------------------------------------------------------
+# 内部安全总线 (最高优先级，防干扰与死锁)
+PF1     I2C2_SCL             I2C2    # 内部 Bus 0
+PF0     I2C2_SDA             I2C2
+PF14    I2C4_SCL             I2C4    # 内部 Bus 1
+PF15    I2C4_SDA             I2C4
 
-# ==========================================
-# 硬件参数存储 (FM25V02A-GTR FRAM)
-# ==========================================
-PF7 SPI5_SCK SPI5
-PH7 SPI5_MISO SPI5
-PF11 SPI5_MOSI SPI5
-PG7 FRAM_CS CS
+# 外部扩展总线 (允许热插拔，超时不波及核心)
+PB8     I2C1_SCL             I2C1    # 外部 Bus 2 (GPS1 接口)
+PB9     I2C1_SDA             I2C1
+PA8     I2C3_SCL             I2C3    # 外部 Bus 3 (U18 扩展接口)
+PH8     I2C3_SDA             I2C3
 
-# 注册 SPI 设备
-SPIDEV ramtron SPI5 DEVID1 FRAM_CS MODE3 8*MHZ 8*MHZ
-define HAL_WITH_RAMTRON 1
-define HAL_STORAGE_SIZE 32768
-
-# ==========================================
-# 传感器 LDO 供电使能
-# ==========================================
-PI11 VDD_3V3_SENSORS1_EN OUTPUT HIGH
-PF4  VDD_3V3_SENSORS2_EN OUTPUT HIGH
-
-# ==========================================
-# I2C 总线映射与安全隔离配置
-# ==========================================
-
-# ------------------------------------------
-# [内部总线 Internal] 
-# 挂载：BMP388, SPL06, MMC5983MA, ATECC608B
-# 特性：最高保护优先级，防外部电磁干扰和死锁
-# ------------------------------------------
-# I2C2 (内部 Bus 0)
-PF1 I2C2_SCL I2C2
-PF0 I2C2_SDA I2C2
-
-# I2C4 (内部 Bus 1)
-PF14 I2C4_SCL I2C4
-PF15 I2C4_SDA I2C4
-
-# ------------------------------------------
-# [外部总线 External] 
-# 挂载：GPS1外置罗盘 (U17), 全能扩展口 (U18)
-# 特性：允许热插拔，总线超时不会波及核心传感器
-# ------------------------------------------
-# I2C1 (外部 Bus 2 - GPS1 接口)
-PB8 I2C1_SCL I2C1  # 若原理图引脚不同，请修改此处的 PB8
-PB9 I2C1_SDA I2C1  # 若原理图引脚不同，请修改此处的 PB9
-
-# I2C3 (外部 Bus 3 - U18 扩展接口)
-PA8 I2C3_SCL I2C3  # 若原理图引脚不同，请修改此处的 PA8
-PH8 I2C3_SDA I2C3  # 若原理图引脚不同，请修改此处的 PH8
-
-# ------------------------------------------
-# 总线排位与物理级隔离掩码 (核心安全逻辑)
-# ------------------------------------------
-# 顺序定义：
-# Bit 0: I2C2 (内部)
-# Bit 1: I2C4 (内部)
-# Bit 2: I2C1 (外部)
-# Bit 3: I2C3 (外部)
+# I2C 隔离掩码配置 (I2C2=Bit0, I2C4=Bit1. 2^0 + 2^1 = 3)
 I2C_ORDER I2C2 I2C4 I2C1 I2C3
-
-# 掩码计算：声明前两条总线 (Bit 0 和 Bit 1) 为内部安全区
-# 算法：2^0 (I2C2) + 2^1 (I2C4) = 1 + 2 = 3
 define HAL_I2C_INTERNAL_MASK 3
 
-# ==========================================
-# 气压计与磁力计驱动配置 (I2C)
-# ==========================================
-# BMP388 挂在 I2C2 (bus 0)，硬件 CSB 已上拉 3.3V 且 SDO 接地，地址固定为 0x76
-BARO BMP388 I2C:0:0x76
+# 挂载 I2C 传感器
+BARO    BMP388               I2C:0:0x76
+BARO    SPL06                I2C:1:0x76
+COMPASS MMC5XX3              I2C:0:0x30 false ROTATION_YAW_90
 
-# SPL06 挂在 I2C4 (bus 1)，假设其地址也为 0x76
-BARO SPL06 I2C:1:0x76
+# ------------------------------------------------------------------------------
+# 6. SPI 总线映射与惯性传感器 (IMU)
+# ------------------------------------------------------------------------------
+# SPI 物理引脚
+PG9     SPI1_MISO            SPI1
+PB5     SPI1_MOSI            SPI1
+PA5     SPI1_SCK             SPI1
 
-# MMC5983MA 挂在 I2C2 (bus 0)，默认地址通常为 0x30，内部罗盘(false)
-COMPASS MMC5XX3 I2C:0:0x30 false ROTATION_YAW_90
+PI2     SPI2_MISO            SPI2
+PI3     SPI2_MOSI            SPI2
+PI1     SPI2_SCK             SPI2
 
-# ==========================================
-# 1. SPI 物理引脚映射
-# ==========================================
-PG9 SPI1_MISO SPI1
-PB5 SPI1_MOSI SPI1
-PA5 SPI1_SCK SPI1
+PC11    SPI3_MISO            SPI3
+PB2     SPI3_MOSI            SPI3
+PC10    SPI3_SCK             SPI3
 
-PI2 SPI2_MISO SPI2
-PI3 SPI2_MOSI SPI2
-PI1 SPI2_SCK SPI2
+# SPI 片选 (CS)
+PI9     SP1_CS1              CS
+PH5     SP2_CS1              CS
+PI4     SP3_CS1              CS
+PI8     SP3_CS2              CS
 
-PC11 SPI3_MISO SPI3
-PB2 SPI3_MOSI SPI3
-PC10 SPI3_SCK SPI3
+# SPI 数据就绪中断 (DRDY)
+PG8     SP1_DRDY1            INPUT
+PA10    SP2_DRDY2            INPUT
+PI6     SP3_DRDY1            INPUT
+PI7     SP3_DRDY2            INPUT
 
-# ==========================================
-# 2. 片选 (CS) 映射
-# ==========================================
-PI9 SP1_CS1 CS
-PH5 SP2_CS1 CS
-PI4 SP3_CS1 CS
-PI8 SP3_CS2 CS
+# 注册虚拟 SPI 设备
+SPIDEV  dev_spi1_1           SPI1 DEVID1 SP1_CS1 MODE3 10*MHZ 10*MHZ
+SPIDEV  dev_spi2_1           SPI2 DEVID1 SP2_CS1 MODE3 2*MHZ  8*MHZ
+SPIDEV  dev_spi3_1           SPI3 DEVID1 SP3_CS1 MODE3 10*MHZ 10*MHZ
+SPIDEV  dev_spi3_2           SPI3 DEVID2 SP3_CS2 MODE3 10*MHZ 10*MHZ
 
-# ==========================================
-# 3. 中断 (DRDY) 映射 (预留为输入)
-# ==========================================
-PG8 SP1_DRDY1 INPUT
-PA10 SP2_DRDY2 INPUT
-PI6 SP3_DRDY1 INPUT
-PI7 SP3_DRDY2 INPUT
+# 挂载 IMU 驱动 (3 颗冗余)
+IMU     BMI270               SPI:dev_spi1_1                 ROTATION_YAW_270
+IMU     Invensensev3         SPI:dev_spi2_1                 ROTATION_YAW_180
+IMU     BMI088               SPI:dev_spi3_1 SPI:dev_spi3_2  ROTATION_YAW_270
 
-# ==========================================
-# 4. 注册虚拟 SPI 设备
-# ==========================================
-SPIDEV dev_spi1_1 SPI1 DEVID1 SP1_CS1 MODE3 10*MHZ 10*MHZ
-SPIDEV dev_spi2_1 SPI2 DEVID1 SP2_CS1 MODE3 2*MHZ 8*MHZ
-SPIDEV dev_spi3_1 SPI3 DEVID1 SP3_CS1 MODE3 10*MHZ 10*MHZ
-SPIDEV dev_spi3_2 SPI3 DEVID2 SP3_CS2 MODE3 10*MHZ 10*MHZ
+# ------------------------------------------------------------------------------
+# 7. 模拟量检测与电池监控 (ADC)
+# ------------------------------------------------------------------------------
+# 物理引脚与底层倍率
+PA0     ADC_VBAT             ADC1 SCALE(11.0)
+PA4     ADC_CURR1            ADC1 SCALE(17.0)
+PB0     ADC_CURR2            ADC1 SCALE(17.0)
+PC3     ADC_AIRS             ADC1 SCALE(2.0)
 
-# ==========================================
-# 5. 挂载 IMU 驱动
-# ==========================================
-IMU BMI270       SPI:dev_spi1_1                ROTATION_YAW_270
-IMU Invensensev3 SPI:dev_spi2_1                ROTATION_YAW_180
-IMU BMI088       SPI:dev_spi3_1 SPI:dev_spi3_2 ROTATION_YAW_270
+# 电池参数宏定义 (STM32 ADC 内部通道号)
+define HAL_BATT_VOLT_PIN     16    # PA0
+define HAL_BATT_CURR_PIN     18    # PA4
+define HAL_BATT_VOLT2_PIN    -1    # 禁用第二路电压
+define HAL_BATT_CURR2_PIN    9     # PB0
 
-# ==========================================
-# 10. TF/MicroSD 卡驱动 (SDMMC2)
-# ==========================================
-PD6  SDMMC2_CK SDMMC2
-PD7  SDMMC2_CMD SDMMC2
-PB14 SDMMC2_D0 SDMMC2
-PB15 SDMMC2_D1 SDMMC2
-PG11 SDMMC2_D2 SDMMC2
-PB4  SDMMC2_D3 SDMMC2
+# 默认电压电流换算倍率
+define HAL_BATT_VOLT_SCALE   11.0
+define HAL_BATT_CURR_SCALE   17.0
+define HAL_BATT_CURR2_SCALE  17.0
 
-# 如果不接检测引脚，某些架构下需要这样强制“始终存在”
-define HAL_SDCARD_ALWAYS_PRESENT 1
-# 定义 TF 卡检测引脚 (假设你使用了 GPIO10)
-# GPIO10 SD_CD INPUT LOW
-# 告诉系统这就是 SD 卡检测信号
-# define HAL_GPIO_PIN_SD_CD 10
+# ------------------------------------------------------------------------------
+# 8. PWM 输出与 UI 状态指示
+# ------------------------------------------------------------------------------
+# PWM 输出通道 (注意：TIM12 缺少 TIMn_UP 的 DMA 选项，需加 NODMA)
+PH10    TIM5_CH1             TIM5 PWM(1)  GPIO(50)
+PH11    TIM5_CH2             TIM5 PWM(2)  GPIO(51)
+PH12    TIM5_CH3             TIM5 PWM(3)  GPIO(52)
+PI0     TIM5_CH4             TIM5 PWM(4)  GPIO(53)
+PD13    TIM4_CH2             TIM4 PWM(5)  GPIO(54)
+PD14    TIM4_CH3             TIM4 PWM(6)  GPIO(55)
+PH6     TIM12_CH1            TIM12 PWM(7) GPIO(56) NODMA
+PH9     TIM12_CH2            TIM12 PWM(8) GPIO(57) NODMA
 
-# 告诉系统使用 FATFS 文件系统并挂载到 SDMMC2 上
-define FATFS_HAL_DEVICE SDCD2
-define HAL_OS_FATFS_IO 1
-
-# 1. 定义物理引脚、标签、初始状态，并分配一个 GPIO 索引号（例如 80）
-PB10 HEATER_EN OUTPUT LOW GPIO(80)
-# 2. 将该索引号绑定到 ArduPilot 的恒温器宏定义上
-define HAL_HEATER_GPIO_PIN 80
-# 3. 开启(1)/关闭(0)恒温逻辑并设置默认参数
-define HAL_HAVE_IMU_HEATER 0
-define HAL_IMU_TEMP_DEFAULT 45
-
-# 串口连接使用shell调试
-define HAL_HAVE_BOARD_SHELL 1
-
-# ==========================================
-# PWM 输出通道
-# ==========================================
-PH10 TIM5_CH1 TIM5 PWM(1) GPIO(50)
-PH11 TIM5_CH2 TIM5 PWM(2) GPIO(51)
-PH12 TIM5_CH3 TIM5 PWM(3) GPIO(52)
-PI0 TIM5_CH4 TIM5 PWM(4) GPIO(53)
-PD13 TIM4_CH2 TIM4 PWM(5) GPIO(54)
-PD14 TIM4_CH3 TIM4 PWM(6) GPIO(55)
-
-# 注意：参考 V6X 架构，TIM12 通常缺少 TIMn_UP 的 DMA 选项，必须加上 NODMA
-PH6 TIM12_CH1 TIM12 PWM(7) GPIO(56) NODMA
-PH9 TIM12_CH2 TIM12 PWM(8) GPIO(57) NODMA
-
-# ==========================================
 # 蜂鸣器 (Buzzer)
-# ==========================================
-PF9 TIM14_CH1 TIM14 GPIO(77) ALARM
+PF9     TIM14_CH1            TIM14 GPIO(77) ALARM
 
-# ==========================================
-# ADC 模拟量检测与电池参数配置
-# ==========================================
-# 1. 物理引脚与底层倍率注册
-PA0 ADC_VBAT ADC1 SCALE(11.0)
-PA4 ADC_CURR1 ADC1 SCALE(17.0)
-PB0 ADC_CURR2 ADC1 SCALE(17.0)
-PC3 ADC_AIRS ADC1 SCALE(2.0)
+# RGB 状态灯 (由主程序 AP_Notify 库全面接管)
+PE3     LED_RED              OUTPUT OPENDRAIN GPIO(90) HIGH
+PE4     LED_GREEN            OUTPUT OPENDRAIN GPIO(91) HIGH
+PE5     LED_BLUE             OUTPUT OPENDRAIN GPIO(92) HIGH
+define AP_NOTIFY_GPIO_LED_RGB_RED_PIN   90
+define AP_NOTIFY_GPIO_LED_RGB_GREEN_PIN 91
+define AP_NOTIFY_GPIO_LED_RGB_BLUE_PIN  92
+define AP_NOTIFY_GPIO_LED_RGB_ENABLED   1
 
-# 2. 定义默认的电池监控引脚对应的 STM32 ADC 通道
-define HAL_BATT_VOLT_PIN 16   # 对应 PA0
-define HAL_BATT_CURR_PIN 18   # 对应 PA4
-define HAL_BATT_VOLT2_PIN -1  # 禁用第二路电压
-define HAL_BATT_CURR2_PIN 9   # 对应 PB0
-
-# 3. 必须指定模拟电池监控器的默认换算倍率 (Scale)
-define HAL_BATT_VOLT_SCALE 11.0
-define HAL_BATT_CURR_SCALE 17.0
-define HAL_BATT_CURR2_SCALE 17.0
-
-# ==========================================
+# ------------------------------------------------------------------------------
+# 9. 高级扩展与通信总线
+# ------------------------------------------------------------------------------
 # CAN 总线
-# ==========================================
-PD0 CAN1_RX CAN1
-PD1 CAN1_TX CAN1
-
-# 如果未来要接入 DroneCAN 设备（如外置罗盘、空速计），必须打开此宏
+PD0     CAN1_RX              CAN1
+PD1     CAN1_TX              CAN1
 define HAL_CAN_DEFAULT_NODE_ID 10
 
-# ==========================================
-# UM982 高精度时钟同步 (PPS 输入)
-# 复用原 RCIN 引脚作为高精度时间戳捕获
-# ==========================================
-PI5 PPS_IN INPUT PULLDOWN GPIO(81)
-
-# ==========================================
-# 外部扩展与触发接口 (EXT_IO)
-# 用于：相机快门触发 / 舵机抛投控制
-# ==========================================
-PH13 EXT_IO OUTPUT LOW GPIO(82)
+# 高精度时钟同步 (UM982 PPS 输入)
+PI5     PPS_IN               INPUT PULLDOWN GPIO(81)
